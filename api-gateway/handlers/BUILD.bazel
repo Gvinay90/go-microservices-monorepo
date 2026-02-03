@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "handlers",
+    srcs = [
+        "auth.go",
+        "expenses.go",
+        "users.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/api-gateway/handlers",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api-gateway/clients",
+        "//pkg/config",
+        "//proto/expense",
+        "@com_github_gin_gonic_gin//:gin",
+    ],
+)

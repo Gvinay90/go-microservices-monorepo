@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "middleware",
+    srcs = [
+        "auth.go",
+        "logger.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/api-gateway/middleware",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/auth",
+        "//pkg/config",
+        "@com_github_gin_gonic_gin//:gin",
+    ],
+)

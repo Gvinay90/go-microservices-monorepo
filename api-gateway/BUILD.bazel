@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "api-gateway_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/vinay/splitwise-grpc/api-gateway",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api-gateway/clients",
+        "//api-gateway/handlers",
+        "//api-gateway/middleware",
+        "//pkg/config",
+        "//pkg/logger",
+        "@com_github_gin_contrib_cors//:cors",
+        "@com_github_gin_gonic_gin//:gin",
+    ],
+)
+
+go_binary(
+    name = "api-gateway",
+    embed = [":api-gateway_lib"],
+    visibility = ["//visibility:public"],
+)
