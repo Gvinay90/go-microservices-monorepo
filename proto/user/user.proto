@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "github.com/vinay/splitwise-grpc/proto/user";
+
+// User represents a user in the system
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  repeated string friend_ids = 4;
+}
+
+// RegisterUserRequest contains user registration details
+message RegisterUserRequest {
+  string name = 1;
+  string email = 2;
+  string password = 3;
+}
+
+// RegisterUserResponse returns the created user
+message RegisterUserResponse {
+  User user = 1;
+}
+
+// GetUserRequest requests a user by ID
+message GetUserRequest {
+  string user_id = 1;
+}
+
+// GetUserResponse returns the requested user
+message GetUserResponse {
+  User user = 1;
+}
+
+// AddFriendRequest adds a friend relationship
+message AddFriendRequest {
+  string user_id = 1;
+  string friend_id = 2; // Optional if email is provided
+  string email = 3;     // Optional if friend_id is provided
+}
+
+// AddFriendResponse confirms friend addition
+message AddFriendResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// GetFriendsRequest gets all friends for a user
+message GetFriendsRequest {
+  string user_id = 1;
+}
+
+// GetFriendsResponse returns list of friends
+message GetFriendsResponse {
+  repeated User friends = 1;
+}
+
+// ListUsersRequest lists all users
+message ListUsersRequest {}
+
+// ListUsersResponse returns all users
+message ListUsersResponse {
+  repeated User users = 1;
+}
+
+// UpdateUserRequest updates user information
+message UpdateUserRequest {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+// UpdateUserResponse returns the updated user
+message UpdateUserResponse {
+  User user = 1;
+}
+
+// UserService manages user operations
+service UserService {
+  // RegisterUser creates a new user
+  rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
+  
+  // GetUser retrieves a user by ID
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  
+  // UpdateUser updates user information
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  
+  // AddFriend creates a friend relationship
+  rpc AddFriend(AddFriendRequest) returns (AddFriendResponse);
+  
+  // GetFriends retrieves all friends for a user
+  rpc GetFriends(GetFriendsRequest) returns (GetFriendsResponse);
+  
+  // ListUsers retrieves all users in the system
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}

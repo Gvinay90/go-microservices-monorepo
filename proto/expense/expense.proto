@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package expense;
+
+option go_package = "github.com/vinay/splitwise-grpc/proto/expense";
+
+// SplitType defines how an expense is split
+enum SplitType {
+  EQUAL = 0;
+  EXACT = 1;
+  PERCENTAGE = 2;
+}
+
+// Split represents how much each user owes
+message Split {
+  string user_id = 1;
+  double amount = 2;
+}
+
+// Expense represents a shared expense
+message Expense {
+  string id = 1;
+  string description = 2;
+  double total_amount = 3;
+  string paid_by = 4;
+  SplitType split_type = 5;
+  repeated Split splits = 6;
+  int64 created_at = 7;
+}
+
+// Balance represents amount owed between two users
+message Balance {
+  string from_user_id = 1;
+  string to_user_id = 2;
+  double amount = 3;
+}
+
+// CreateExpenseRequest creates a new expense
+message CreateExpenseRequest {
+  string description = 1;
+  double total_amount = 2;
+  string paid_by = 3;
+  SplitType split_type = 4;
+  repeated Split splits = 5;
+}
+
+// CreateExpenseResponse returns the created expense
+message CreateExpenseResponse {
+  Expense expense = 1;
+}
+
+// GetExpenseRequest requests an expense by ID
+message GetExpenseRequest {
+  string expense_id = 1;
+}
+
+// GetExpenseResponse returns the requested expense
+message GetExpenseResponse {
+  Expense expense = 1;
+}
+
+// ListExpensesRequest lists expenses for a user
+message ListExpensesRequest {
+  string user_id = 1;
+}
+
+// ListExpensesResponse returns list of expenses
+message ListExpensesResponse {
+  repeated Expense expenses = 1;
+}
+
+// GetBalancesRequest gets balances for a user
+message GetBalancesRequest {
+  string user_id = 1;
+}
+
+// GetBalancesResponse returns user balances
+message GetBalancesResponse {
+  repeated Balance balances = 1;
+}
+
+// SettleBalanceRequest settles a balance between users
+message SettleBalanceRequest {
+  string from_user_id = 1;
+  string to_user_id = 2;
+  double amount = 3;
+}
+
+// SettleBalanceResponse confirms settlement
+message SettleBalanceResponse {
+  bool success = 1;
+  string message = 2;
+  Balance remaining_balance = 3;
+}
+
+// UpdateExpenseRequest updates an expense
+message UpdateExpenseRequest {
+  string expense_id = 1;
+  string description = 2;
+  double total_amount = 3;
+}
+
+// UpdateExpenseResponse returns the updated expense
+message UpdateExpenseResponse {
+  Expense expense = 1;
+}
+
+// DeleteExpenseRequest deletes an expense
+message DeleteExpenseRequest {
+  string expense_id = 1;
+}
+
+// DeleteExpenseResponse confirms deletion
+message DeleteExpenseResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ExpenseService manages expense operations
+service ExpenseService {
+  // CreateExpense creates a new shared expense
+  rpc CreateExpense(CreateExpenseRequest) returns (CreateExpenseResponse);
+  
+  // GetExpense retrieves an expense by ID
+  rpc GetExpense(GetExpenseRequest) returns (GetExpenseResponse);
+  
+  // UpdateExpense updates an expense
+  rpc UpdateExpense(UpdateExpenseRequest) returns (UpdateExpenseResponse);
+  
+  // DeleteExpense deletes an expense
+  rpc DeleteExpense(DeleteExpenseRequest) returns (DeleteExpenseResponse);
+  
+  // ListExpenses retrieves all expenses for a user
+  rpc ListExpenses(ListExpensesRequest) returns (ListExpensesResponse);
+  
+  // GetBalances retrieves all balances for a user
+  rpc GetBalances(GetBalancesRequest) returns (GetBalancesResponse);
+  
+  // SettleBalance settles a balance between two users
+  rpc SettleBalance(SettleBalanceRequest) returns (SettleBalanceResponse);
+}
