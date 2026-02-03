@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "storage",
+    srcs = [
+        "db.go",
+        "models.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/storage",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/config",
+        "@io_gorm_driver_postgres//:postgres",
+        "@io_gorm_driver_sqlite//:sqlite",
+        "@io_gorm_gorm//:gorm",
+    ],
+)

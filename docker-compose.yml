@@ -1,0 +1,203 @@
+services:
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: user_service
+    ports:
+      - "50051:50051"
+    networks:
+      - splitwise-net
+    environment:
+      - APP_DATABASE_DRIVER=postgres
+      - APP_DATABASE_DSN=host=app-db port=5432 user=splitwise password=splitwise dbname=splitwise sslmode=disable
+    depends_on:
+      app-db:
+        condition: service_healthy
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: ./internal/user
+        - action: rebuild
+          path: ./pkg
+        - action: rebuild
+          path: ./proto
+        - action: rebuild
+          path: ./services/user
+        - action: rebuild
+          path: ./go.mod
+
+  expense-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: expense_service
+    ports:
+      - "50052:50052"
+    networks:
+      - splitwise-net
+    environment:
+      - APP_SERVER_PORT=:50052
+      - APP_DATABASE_DRIVER=postgres
+      - APP_DATABASE_DSN=host=app-db port=5432 user=splitwise password=splitwise dbname=splitwise sslmode=disable
+    depends_on:
+      app-db:
+        condition: service_healthy
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: ./internal/expense
+        - action: rebuild
+          path: ./pkg
+        - action: rebuild
+          path: ./proto
+        - action: rebuild
+          path: ./services/expense
+        - action: rebuild
+          path: ./go.mod
+
+  # Client service is not needed for web app deployment
+  # Uncomment if you need to test gRPC client
+  # client:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: client
+  #   environment:
+  #     - USER_SERVICE_ADDR=user-service:50051
+  #     - EXPENSE_SERVICE_ADDR=expense-service:50052
+  #   networks:
+  #     - splitwise-net
+  #   depends_on:
+  #     - user-service
+  #     - expense-service
+  #   restart: no
+
+  # Shared PostgreSQL database for application services
+  app-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: splitwise
+      POSTGRES_USER: splitwise
+      POSTGRES_PASSWORD: splitwise
+    ports:
+      - "5433:5432" # Expose on 5433 to avoid conflict with Keycloak DB
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    networks:
+      - splitwise-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U splitwise" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    networks:
+      - splitwise-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+      KC_HOSTNAME_URL: http://localhost:8080
+      KC_HOSTNAME_ADMIN_URL: http://localhost:8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    networks:
+      - splitwise-net
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api_gateway
+    ports:
+      - "8081:8080"
+    environment:
+      - APP_DATABASE_DRIVER=postgres
+      - APP_DATABASE_DSN=host=app-db port=5432 user=splitwise password=splitwise dbname=splitwise sslmode=disable
+      - USER_SERVICE_ADDR=user-service:50051
+      - EXPENSE_SERVICE_ADDR=expense-service:50052
+    depends_on:
+      - user-service
+      - expense-service
+      - keycloak
+    networks:
+      - splitwise-net
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: ./api-gateway
+        - action: rebuild
+          path: ./pkg
+        - action: rebuild
+          path: ./go.mod
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - splitwise-net
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: ./web/src
+        - action: rebuild
+          path: ./web/public
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025" # SMTP server
+      - "8025:8025" # Web UI
+    networks:
+      - splitwise-net
+    restart: unless-stopped
+
+networks:
+  splitwise-net:
+    driver: bridge
+
+volumes:
+  keycloak-db-data:
+  app-db-data:

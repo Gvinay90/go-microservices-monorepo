@@ -1,0 +1,220 @@
+{
+    "realm": "expense-sharing",
+    "enabled": true,
+    "sslRequired": "none",
+    "registrationAllowed": false,
+    "loginWithEmailAllowed": true,
+    "duplicateEmailsAllowed": false,
+    "resetPasswordAllowed": true,
+    "editUsernameAllowed": false,
+    "bruteForceProtected": true,
+    "smtpServer": {
+        "replyToDisplayName": "Expense Sharing Support",
+        "starttls": "false",
+        "auth": "",
+        "port": "1025",
+        "host": "mailhog",
+        "replyTo": "support@expense-sharing.com",
+        "from": "no-reply@expense-sharing.com",
+        "fromDisplayName": "Expense Sharing App",
+        "ssl": "false"
+    },
+    "clients": [
+        {
+            "clientId": "expense-app",
+            "name": "Expense Sharing Application",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "serviceAccountsEnabled": true,
+            "authorizationServicesEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "standardFlowEnabled": true,
+            "fullScopeAllowed": true,
+            "redirectUris": [
+                "http://localhost:3000/*"
+            ],
+            "webOrigins": [
+                "http://localhost:3000"
+            ],
+            "secret": "1aLlWaA8A37Qa6HyyUGdbx9tnGZRmXAH",
+            "defaultClientScopes": [
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "optionalClientScopes": [
+                "address",
+                "phone",
+                "offline_access",
+                "microprofile-jwt"
+            ],
+            "protocolMappers": [
+                {
+                    "name": "Client ID",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "user.session.note": "clientId",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "claim.name": "clientId",
+                        "jsonType.label": "String"
+                    }
+                },
+                {
+                    "name": "Client Host",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "user.session.note": "clientHost",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "claim.name": "clientHost",
+                        "jsonType.label": "String"
+                    }
+                },
+                {
+                    "name": "Client IP Address",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "user.session.note": "clientAddress",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "claim.name": "clientAddress",
+                        "jsonType.label": "String"
+                    }
+                }
+            ]
+        },
+        {
+            "clientId": "user-service",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "serviceAccountsEnabled": true,
+            "authorizationServicesEnabled": true,
+            "redirectUris": [
+                "*"
+            ],
+            "webOrigins": [
+                "*"
+            ],
+            "secret": "user-service-secret"
+        },
+        {
+            "clientId": "expense-service",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "serviceAccountsEnabled": true,
+            "authorizationServicesEnabled": true,
+            "redirectUris": [
+                "*"
+            ],
+            "webOrigins": [
+                "*"
+            ],
+            "secret": "expense-service-secret"
+        }
+    ],
+    "clientScopes": [
+        {
+            "name": "roles",
+            "protocol": "openid-connect",
+            "attributes": {
+                "include.in.token.scope": "true",
+                "display.on.consent.screen": "true"
+            }
+        }
+    ],
+    "roles": {
+        "realm": [
+            {
+                "name": "user",
+                "description": "Standard user role"
+            },
+            {
+                "name": "admin",
+                "description": "Administrator role"
+            }
+        ]
+    },
+    "users": [
+        {
+            "username": "alice",
+            "email": "alice@example.com",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Alice",
+            "lastName": "Smith",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "user"
+            ]
+        },
+        {
+            "username": "bob",
+            "email": "bob@example.com",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Bob",
+            "lastName": "Jones",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "user"
+            ]
+        },
+        {
+            "username": "admin",
+            "email": "admin@example.com",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Admin",
+            "lastName": "User",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "admin123",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "user",
+                "admin"
+            ]
+        },
+        {
+            "username": "service-account-expense-app",
+            "email": "service-account-expense-app@placeholder.org",
+            "enabled": true,
+            "emailVerified": false,
+            "serviceAccountClientId": "expense-app",
+            "clientRoles": {
+                "realm-management": [
+                    "manage-users",
+                    "view-users",
+                    "query-users",
+                    "create-client"
+                ]
+            }
+        }
+    ]
+}
