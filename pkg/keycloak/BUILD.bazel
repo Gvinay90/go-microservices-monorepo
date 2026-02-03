@@ -1,0 +1,11 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "keycloak",
+    srcs = [
+        "client.go",
+        "password_reset.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/pkg/keycloak",
+    visibility = ["//visibility:public"],
+)

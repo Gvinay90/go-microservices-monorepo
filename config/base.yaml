@@ -1,0 +1,25 @@
+server:
+  port: ":50051"
+  name: "unknown-service"
+  # Optional TLS configuration
+  # tls_cert: "certs/server-cert.pem"
+  # tls_key: "certs/server-key.pem"
+  # Rate limiting (requests per minute)
+  rate_limit: 100
+
+database:
+  driver: "postgres"
+  dsn: "host=localhost port=5433 user=splitwise password=splitwise dbname=splitwise sslmode=disable"
+
+log:
+  level: "info"
+  format: "text"
+
+auth:
+  enabled: true  # Enabled with full Keycloak integration
+  keycloak_url: "http://keycloak:8080"
+  realm: "expense-sharing"
+  client_id: "expense-app"
+  client_secret: "1aLlWaA8A37Qa6HyyUGdbx9tnGZRmXAH"  # Must match realm-export.json
+  # Enable audit logging for security events
+  audit_logging: true
