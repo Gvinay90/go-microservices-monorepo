@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "user_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/vinay/splitwise-grpc/services/user",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//internal/user/handler",
+        "//internal/user/repository",
+        "//internal/user/service",
+        "//pkg/auth",
+        "//pkg/config",
+        "//pkg/logger",
+        "//pkg/server",
+        "//proto/user",
+        "//storage",
+        "@org_golang_google_grpc//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "user_service",
+    data = ["//:config_files"],
+    embed = [":user_lib"],
+    visibility = ["//visibility:public"],
+)

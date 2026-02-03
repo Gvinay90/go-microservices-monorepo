@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "service",
+    srcs = [
+        "service.go",
+        "user.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/internal/user/service",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/user/domain",
+        "//internal/user/repository",
+        "//pkg/keycloak",
+        "@org_golang_x_crypto//bcrypt",
+    ],
+)

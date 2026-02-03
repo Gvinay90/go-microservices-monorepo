@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "service",
+    srcs = [
+        "expense.go",
+        "service.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/internal/expense/service",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/expense/domain",
+        "//internal/expense/repository",
+    ],
+)

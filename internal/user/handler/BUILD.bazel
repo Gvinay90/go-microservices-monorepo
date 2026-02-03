@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "handler",
+    srcs = ["grpc.go"],
+    importpath = "github.com/vinay/splitwise-grpc/internal/user/handler",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/user/domain",
+        "//internal/user/service",
+        "//proto/user",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)

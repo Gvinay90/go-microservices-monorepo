@@ -1,0 +1,11 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "domain",
+    srcs = [
+        "errors.go",
+        "expense.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/internal/expense/domain",
+    visibility = ["//:__subpackages__"],
+)

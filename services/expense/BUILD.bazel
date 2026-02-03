@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "expense_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/vinay/splitwise-grpc/services/expense",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//internal/expense/handler",
+        "//internal/expense/repository",
+        "//internal/expense/service",
+        "//pkg/auth",
+        "//pkg/config",
+        "//pkg/logger",
+        "//pkg/server",
+        "//proto/expense",
+        "//storage",
+        "@org_golang_google_grpc//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "expense_service",
+    data = ["//:config_files"],
+    embed = [":expense_lib"],
+    visibility = ["//visibility:public"],
+)

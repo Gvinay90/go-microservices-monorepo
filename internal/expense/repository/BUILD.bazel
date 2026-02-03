@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "repository",
+    srcs = [
+        "gorm.go",
+        "repository.go",
+    ],
+    importpath = "github.com/vinay/splitwise-grpc/internal/expense/repository",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/expense/domain",
+        "//storage",
+        "@io_gorm_gorm//:gorm",
+    ],
+)
