@@ -46,9 +46,10 @@ func AuthRequired(cfg *config.Config) gin.HandlerFunc {
 				return
 			}
 
-			// Add claims to context
+			// Add claims to context (preferred_username fallback when email is empty)
 			c.Set("user_id", claims.Subject)
 			c.Set("email", claims.Email)
+			c.Set("preferred_username", claims.PreferredUsername)
 			c.Set("roles", claims.RealmAccess.Roles)
 		}
 
@@ -78,6 +79,7 @@ func OptionalAuth(cfg *config.Config) gin.HandlerFunc {
 				if claims, err := validator.ValidateToken(c.Request.Context(), token); err == nil {
 					c.Set("user_id", claims.Subject)
 					c.Set("email", claims.Email)
+					c.Set("preferred_username", claims.PreferredUsername)
 					c.Set("roles", claims.RealmAccess.Roles)
 				}
 			}

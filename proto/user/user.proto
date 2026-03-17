@@ -17,6 +17,7 @@ message RegisterUserRequest {
   string name = 1;
   string email = 2;
   string password = 3;
+  string id = 4;  // Optional: use when syncing from Keycloak (subject id)
 }
 
 // RegisterUserResponse returns the created user

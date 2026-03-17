@@ -121,22 +121,29 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	email, _ := c.Get("email")
+	emailVal, _ := c.Get("email")
+	preferredUsername, _ := c.Get("preferred_username")
 	roles, _ := c.Get("roles")
 
-	// Ensure user exists in our database (sync from Keycloak)
-	userIDStr := userID.(string)
-	emailStr, _ := email.(string)
+	// Use email from token; fallback to preferred_username (Keycloak often uses it for login)
+	emailStr, _ := emailVal.(string)
+	if emailStr == "" {
+		emailStr, _ = preferredUsername.(string)
+	}
 
-	// Try to get user from our database
-	_, err := h.userClient.GetUser(c.Request.Context(), "", userIDStr)
+	tokenStr, _ := c.Get("jwt_token")
+	token, _ := tokenStr.(string)
+
+	userIDStr := userID.(string)
+
+	// Try to get user from our database (forward JWT so user-service accepts the request)
+	_, err := h.userClient.GetUser(c.Request.Context(), token, userIDStr)
 	if err != nil {
-		// User doesn't exist in our DB, create them
+		// User doesn't exist in our DB, create them with Keycloak ID so lookups by sub work
 		h.logger.Info("User not found in database, creating from Keycloak", "user_id", userIDStr, "email", emailStr)
 
-		// Extract name from email (before @)
 		name := emailStr
-		if atIndex := len(emailStr); atIndex > 0 {
+		if emailStr != "" {
 			for i, ch := range emailStr {
 				if ch == '@' {
 					name = emailStr[:i]
@@ -144,9 +151,11 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 				}
 			}
 		}
+		if name == "" {
+			name = "User"
+		}
 
-		// Register user with Keycloak ID
-		_, err := h.userClient.RegisterUserWithID(c.Request.Context(), userIDStr, name, emailStr, "keycloak-managed")
+		_, err := h.userClient.RegisterUserWithID(c.Request.Context(), token, userIDStr, name, emailStr, "keycloak-managed")
 		if err != nil {
 			h.logger.Error("Failed to sync user to database", "error", err, "user_id", userIDStr)
 			// Continue anyway - user can still use the app
@@ -155,7 +164,7 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"user_id": userID,
-		"email":   email,
+		"email":   emailStr,
 		"roles":   roles,
 	})
 }

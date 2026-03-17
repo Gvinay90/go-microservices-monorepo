@@ -48,11 +48,13 @@ func (c *UserClient) contextWithAuth(ctx context.Context, token string) context.
 }
 
 func (c *UserClient) RegisterUser(ctx context.Context, name, email, password string) (*pb.RegisterUserResponse, error) {
-	return c.RegisterUserWithID(ctx, "", name, email, password)
+	return c.RegisterUserWithID(ctx, "", "", name, email, password)
 }
 
-func (c *UserClient) RegisterUserWithID(ctx context.Context, id, name, email, password string) (*pb.RegisterUserResponse, error) {
+func (c *UserClient) RegisterUserWithID(ctx context.Context, token, id, name, email, password string) (*pb.RegisterUserResponse, error) {
+	ctx = c.contextWithAuth(ctx, token)
 	req := &pb.RegisterUserRequest{
+		Id:       id,
 		Name:     name,
 		Email:    email,
 		Password: password,

@@ -30,8 +30,8 @@ func NewGRPCHandler(svc service.Service, log *slog.Logger) *GRPCHandler {
 
 // RegisterUser handles user registration
 func (h *GRPCHandler) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
-	// Pass empty ID - will be auto-generated in service
-	user, err := h.svc.Register(ctx, "", req.Name, req.Email, req.Password)
+	// Use req.Id when syncing from Keycloak (subject id); otherwise service auto-generates
+	user, err := h.svc.Register(ctx, req.Id, req.Name, req.Email, req.Password)
 	if err != nil {
 		return nil, h.mapError(err)
 	}
