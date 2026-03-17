@@ -134,10 +134,29 @@ services:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'" ]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null && echo OK || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
+
+  keycloak-init:
+    image: python:3.11-alpine
+    command: python /scripts/configure_keycloak_permissions.py
+    volumes:
+      - ./scripts/configure_keycloak_permissions.py:/scripts/configure_keycloak_permissions.py:ro
+    environment:
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KEYCLOAK_REALM=expense-sharing
+      - KEYCLOAK_CLIENT_ID=expense-app
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - splitwise-net
+    restart: no
 
   api-gateway:
     build:
@@ -155,6 +174,7 @@ services:
       - user-service
       - expense-service
       - keycloak
+      - keycloak-init
     networks:
       - splitwise-net
     restart: unless-stopped
@@ -187,6 +207,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog
+    platform: linux/amd64
     ports:
       - "1025:1025" # SMTP server
       - "8025:8025" # Web UI

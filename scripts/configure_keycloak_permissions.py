@@ -5,14 +5,17 @@ This grants the expense-app service account the ability to create and manage use
 """
 
 import urllib.request
+import urllib.parse
+import urllib.error
 import json
+import os
 import time
 
-KEYCLOAK_URL = "http://localhost:8080"
-ADMIN_USER = "admin"
-ADMIN_PASSWORD = "admin"
-REALM = "expense-sharing"
-CLIENT_ID = "expense-app"
+KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://localhost:8080")
+ADMIN_USER = os.environ.get("KEYCLOAK_ADMIN", "admin")
+ADMIN_PASSWORD = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
+REALM = os.environ.get("KEYCLOAK_REALM", "expense-sharing")
+CLIENT_ID = os.environ.get("KEYCLOAK_CLIENT_ID", "expense-app")
 
 def get_admin_token():
     """Get admin access token"""
@@ -95,18 +98,154 @@ def assign_roles_to_service_account(token, service_account_id, realm_mgmt_uuid, 
         print(f"Warning: {e.code} - {e.read().decode()}")
         return False
 
+
+def get_roles_scope_id(token):
+    """Get the UUID of the 'roles' client scope"""
+    url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/client-scopes"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(req) as response:
+        scopes = json.loads(response.read())
+        for s in scopes:
+            if s["name"] == "roles":
+                return s["id"]
+    return None
+
+
+def get_scope_mappers(token, scope_id):
+    """Return list of existing mapper names for a client scope"""
+    url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/client-scopes/{scope_id}/protocol-mappers/models"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req) as response:
+            return {m["name"] for m in json.loads(response.read())}
+    except urllib.error.HTTPError:
+        return set()
+
+
+def add_scope_mapper(token, scope_id, mapper):
+    """Add a single protocol mapper to a client scope (idempotent)"""
+    url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/client-scopes/{scope_id}/protocol-mappers/models"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(mapper).encode(),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            return response.status == 201
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        if e.code == 409:
+            return True  # already exists
+        print(f"  Warning adding mapper: {e.code} - {body}")
+        return False
+
+
+def fix_roles_scope_mappers(token):
+    """
+    Ensure the 'roles' client scope has the required protocol mappers so that
+    realm roles and client roles are embedded in JWTs.
+    """
+    print("Checking 'roles' client scope mappers...")
+    scope_id = get_roles_scope_id(token)
+    if not scope_id:
+        print("  WARNING: 'roles' client scope not found, skipping mapper fix.")
+        return
+
+    existing = get_scope_mappers(token, scope_id)
+    print(f"  Existing mappers: {existing or 'none'}")
+
+    mappers = [
+        {
+            "name": "realm roles",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-realm-role-mapper",
+            "consentRequired": False,
+            "config": {
+                "multivalued": "true",
+                "user.attribute": "foo",
+                "claim.name": "realm_access.roles",
+                "jsonType.label": "String",
+                "access.token.claim": "true",
+                "id.token.claim": "true",
+                "lightweight.claim": "false"
+            }
+        },
+        {
+            "name": "client roles",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-client-role-mapper",
+            "consentRequired": False,
+            "config": {
+                "multivalued": "true",
+                "user.attribute": "foo",
+                "claim.name": "resource_access.${client_id}.roles",
+                "jsonType.label": "String",
+                "access.token.claim": "true",
+                "id.token.claim": "false",
+                "lightweight.claim": "false"
+            }
+        },
+        {
+            "name": "audience resolve",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-resolve-mapper",
+            "consentRequired": False,
+            "config": {
+                "access.token.claim": "true",
+                "id.token.claim": "false"
+            }
+        }
+    ]
+
+    for mapper in mappers:
+        name = mapper["name"]
+        if name in existing:
+            print(f"  ✓ Mapper already exists: {name}")
+        else:
+            ok = add_scope_mapper(token, scope_id, mapper)
+            print(f"  {'✓' if ok else '✗'} Added mapper: {name}")
+
+    print("'roles' scope mappers are configured correctly.")
+
+def wait_for_keycloak(max_retries=30, delay=5):
+    """Wait for Keycloak to be reachable and ready"""
+    url = f"{KEYCLOAK_URL}/health/ready"
+    for attempt in range(1, max_retries + 1):
+        try:
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    print(f"Keycloak is ready (attempt {attempt})")
+                    return True
+        except Exception as e:
+            print(f"Attempt {attempt}/{max_retries}: Keycloak not ready yet ({e}), retrying in {delay}s...")
+        time.sleep(delay)
+    return False
+
+
 def main():
-    print("Configuring Keycloak service account permissions...")
-    
-    # Wait for Keycloak to be ready
+    print(f"Configuring Keycloak service account permissions at {KEYCLOAK_URL}...")
+
     print("Waiting for Keycloak to be ready...")
-    time.sleep(5)
-    
+    if not wait_for_keycloak():
+        print("ERROR: Keycloak did not become ready in time.")
+        return False
+
     try:
         # Get admin token
         print("Getting admin token...")
         token = get_admin_token()
-        
+
+        # Fix the 'roles' scope mappers FIRST so service-account tokens carry roles
+        fix_roles_scope_mappers(token)
+        # Refresh token after scope changes
+        token = get_admin_token()
+
         # Get expense-app client UUID
         print(f"Finding {CLIENT_ID} client...")
         client_uuid = get_client_uuid(token)
