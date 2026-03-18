@@ -1,122 +1,162 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function CreateExpenseForm({ friends, currentUser, onSubmit, onCancel }) {
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [selectedFriends, setSelectedFriends] = useState([]);
+    const [validationError, setValidationError] = useState('');
+
+    const participantCount = selectedFriends.length + 1;
+    const totalAmount = parseFloat(amount) || 0;
+    const splitAmount = totalAmount > 0 ? (totalAmount / participantCount).toFixed(2) : '0.00';
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        setValidationError('');
 
-        const totalAmount = parseFloat(amount);
         if (!totalAmount || totalAmount <= 0) {
-            alert("Please enter a valid amount");
+            setValidationError('Please enter a valid amount greater than zero.');
             return;
         }
 
-        // Participants include the current user + selected friends
-        // Wait, does the user want to split with themselves? Usually yes.
-        // "I select who I want to share with"
-
         const participants = [currentUser.user_id, ...selectedFriends];
-        const splitAmount = totalAmount / participants.length;
-
-        const splits = participants.map(userId => ({
-            user_id: userId,
-            amount: splitAmount // Equal split
-        }));
+        const perPerson = totalAmount / participants.length;
 
         onSubmit({
             description,
             total_amount: totalAmount,
-            paid_by: currentUser.user_id, // User paid
-            splits
+            paid_by: currentUser.user_id,
+            splits: participants.map((userId) => ({ user_id: userId, amount: perPerson })),
         });
     };
 
     const toggleFriend = (friendId) => {
-        if (selectedFriends.includes(friendId)) {
-            setSelectedFriends(selectedFriends.filter(id => id !== friendId));
-        } else {
-            setSelectedFriends([...selectedFriends, friendId]);
-        }
+        setSelectedFriends((prev) =>
+            prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
+        );
     };
 
     return (
-        <form onSubmit={handleSubmit} className="mb-6 p-6 bg-white rounded-lg shadow-lg border border-indigo-100">
-            <h3 className="text-xl font-bold mb-4 text-indigo-700">Add New Expense</h3>
+        <div className="border border-indigo-100 bg-indigo-50/40 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-slate-900">New Expense</h3>
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="w-7 h-7 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
 
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <input
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="input w-full"
-                        placeholder="e.g. Dinner at Mario's"
-                        required
-                    />
+            {validationError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-4 text-sm">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {validationError}
                 </div>
+            )}
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount ($)</label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="input w-full"
-                        placeholder="0.00"
-                        required
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Split with:</label>
-                    <div className="max-h-40 overflow-y-auto border rounded-md p-2 bg-gray-50">
-                        {friends.length === 0 ? (
-                            <p className="text-sm text-gray-500 italic">No friends found. Add some friends first!</p>
-                        ) : (
-                            friends.map(friend => (
-                                <div key={friend.id} className="flex items-center space-x-2 py-1">
-                                    <input
-                                        type="checkbox"
-                                        id={`friend-${friend.id}`}
-                                        checked={selectedFriends.includes(friend.id)}
-                                        onChange={() => toggleFriend(friend.id)}
-                                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                                    />
-                                    <label htmlFor={`friend-${friend.id}`} className="text-sm text-gray-700 cursor-pointer select-none">
-                                        {friend.name} ({friend.email})
-                                    </label>
-                                </div>
-                            ))
-                        )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
+                            Description
+                        </label>
+                        <input
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="input bg-white"
+                            placeholder="e.g. Dinner at Mario's"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
+                            Total Amount ($)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute inset-y-0 left-3.5 flex items-center text-slate-400 text-sm font-medium pointer-events-none">$</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                className="input bg-white pl-7"
+                                placeholder="0.00"
+                                required
+                            />
+                        </div>
                     </div>
                 </div>
 
-                <div className="pt-2">
-                    <p className="text-sm text-gray-600 mb-2">
-                        You and {selectedFriends.length} others will owe
-                        <span className="font-bold text-indigo-600 ml-1">
-                            ${(amount && (parseFloat(amount) / (selectedFriends.length + 1)).toFixed(2)) || '0.00'}
-                        </span> each.
-                    </p>
+                <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                        Split with
+                    </label>
+
+                    {friends.length === 0 ? (
+                        <div className="border border-dashed border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-400 bg-white">
+                            No friends yet — add some from the Friends page first.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {friends.map((friend) => {
+                                const selected = selectedFriends.includes(friend.id);
+                                return (
+                                    <label
+                                        key={friend.id}
+                                        className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                                            selected
+                                                ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
+                                                : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selected}
+                                            onChange={() => toggleFriend(friend.id)}
+                                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 flex-shrink-0"
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">{friend.name}</p>
+                                            <p className="text-xs opacity-60 truncate">{friend.email}</p>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
-                <div className="flex gap-3 pt-2">
-                    <button type="submit" className="btn btn-primary flex-1">
+                {/* Split preview */}
+                <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3">
+                    <div className="text-sm text-slate-600">
+                        <span className="font-medium">{participantCount}</span> {participantCount === 1 ? 'person' : 'people'} splitting
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs text-slate-400">Each person pays</p>
+                        <p className="text-lg font-bold text-indigo-600">${splitAmount}</p>
+                    </div>
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                    <button type="submit" className="btn btn-primary flex-1 py-2.5">
                         Save Expense
                     </button>
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="btn btn-secondary flex-1"
+                        className="btn btn-secondary flex-1 py-2.5"
                     >
                         Cancel
                     </button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     );
 }
