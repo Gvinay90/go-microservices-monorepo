@@ -79,14 +79,17 @@ export default function CreateExpenseForm({ friends, currentUser, onSubmit, onCa
                             Total Amount ($)
                         </label>
                         <div className="relative">
-                            <span className="absolute inset-y-0 left-3.5 flex items-center text-slate-400 text-sm font-medium pointer-events-none">$</span>
+                            {/* Prefix kept outside the input text area to avoid overlapping digits */}
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center text-slate-400 text-sm font-medium pointer-events-none">
+                                $
+                            </span>
                             <input
                                 type="number"
                                 step="0.01"
                                 min="0.01"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
-                                className="input bg-white pl-7"
+                                className="input bg-white pl-9"
                                 placeholder="0.00"
                                 required
                             />

@@ -57,9 +57,11 @@ func (c *ExpenseClient) GetExpense(ctx context.Context, token, expenseID string)
 	return c.client.GetExpense(ctx, req)
 }
 
-func (c *ExpenseClient) ListExpenses(ctx context.Context, token string) (*pb.ListExpensesResponse, error) {
+func (c *ExpenseClient) ListExpenses(ctx context.Context, token, userID string) (*pb.ListExpensesResponse, error) {
 	ctx = c.contextWithAuth(ctx, token)
-	req := &pb.ListExpensesRequest{}
+	req := &pb.ListExpensesRequest{
+		UserId: userID,
+	}
 	return c.client.ListExpenses(ctx, req)
 }
 

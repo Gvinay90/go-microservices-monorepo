@@ -84,8 +84,10 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 func (h *ExpenseHandler) ListExpenses(c *gin.Context) {
 	token, _ := c.Get("jwt_token")
 	tokenStr, _ := token.(string)
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
 
-	resp, err := h.expenseClient.ListExpenses(c.Request.Context(), tokenStr)
+	resp, err := h.expenseClient.ListExpenses(c.Request.Context(), tokenStr, userIDStr)
 	if err != nil {
 		h.logger.Error("Failed to list expenses", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list expenses"})
@@ -94,11 +96,19 @@ func (h *ExpenseHandler) ListExpenses(c *gin.Context) {
 
 	expenses := make([]gin.H, 0, len(resp.Expenses))
 	for _, expense := range resp.Expenses {
+		splits := make([]gin.H, 0, len(expense.Splits))
+		for _, split := range expense.Splits {
+			splits = append(splits, gin.H{
+				"user_id": split.UserId,
+				"amount":  split.Amount,
+			})
+		}
 		expenses = append(expenses, gin.H{
 			"id":           expense.Id,
 			"description":  expense.Description,
 			"total_amount": expense.TotalAmount,
 			"paid_by":      expense.PaidBy,
+			"splits":       splits,
 			"created_at":   expense.CreatedAt,
 		})
 	}

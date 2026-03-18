@@ -70,7 +70,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	// Create user in our database with Keycloak ID
-	resp, err := h.userClient.RegisterUser(c.Request.Context(), req.Name, req.Email, req.Password)
+	// IMPORTANT: use Keycloak's user ID as our DB primary key.
+	// The frontend passes `claims.sub` as `user_id` for later requests, so the DB row must use the same ID.
+	resp, err := h.userClient.RegisterUserWithID(c.Request.Context(), "", keycloakUserID, req.Name, req.Email, req.Password)
 	if err != nil {
 		h.logger.Error("Failed to create user in database", "error", err, "keycloak_id", keycloakUserID)
 		// Note: User exists in Keycloak but not in our DB - this is a partial failure
