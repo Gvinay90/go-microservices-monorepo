@@ -22,4 +22,10 @@ type Repository interface {
 
 	// SettleBalance records a settlement between users
 	SettleBalance(ctx context.Context, fromUserID, toUserID string, amount float64) error
+
+	// Update updates an expense (including recalculating split amounts)
+	Update(ctx context.Context, expenseID string, description string, totalAmount float64) (*domain.Expense, error)
+
+	// Delete deletes an expense and its splits
+	Delete(ctx context.Context, expenseID string) error
 }

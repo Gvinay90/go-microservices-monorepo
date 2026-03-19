@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { expenseService } from '../services/expenses';
@@ -48,27 +48,52 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [createError, setCreateError] = useState('');
+    const [netBalance, setNetBalance] = useState(null);
+
+    const [editExpenseId, setEditExpenseId] = useState(null);
+    const [editDescription, setEditDescription] = useState('');
+    const [editTotalAmount, setEditTotalAmount] = useState('');
+    const [editError, setEditError] = useState('');
+
+    const [deletingExpenseId, setDeletingExpenseId] = useState(null);
+
+    const [settleToUserId, setSettleToUserId] = useState('');
+    const [settleAmount, setSettleAmount] = useState('');
+    const [settleError, setSettleError] = useState('');
+    const [settleSuccess, setSettleSuccess] = useState('');
+    const [settling, setSettling] = useState(false);
+
+    const loadData = useCallback(async () => {
+        try {
+            // Load friends/expenses first. Net balance is optional; if it fails
+            // we still want the user list + expense form to render.
+            const [expensesData, friendsData] = await Promise.all([
+                expenseService.getExpenses(),
+                userService.getFriends(user.user_id),
+            ]);
+
+            setExpenses(expensesData || []);
+            setFriends(friendsData || []);
+
+            try {
+                const netBalanceData = await expenseService.getNetBalance();
+                setNetBalance(typeof netBalanceData === 'number' ? netBalanceData : null);
+            } catch (err) {
+                console.warn('Failed to load net balance:', err);
+                setNetBalance(null);
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user?.user_id]);
 
     useEffect(() => {
         if (user?.user_id) {
             loadData();
         }
-    }, [user]);
-
-    const loadData = async () => {
-        try {
-            const [expensesData, friendsData] = await Promise.all([
-                expenseService.getExpenses(),
-                userService.getFriends(user.user_id),
-            ]);
-            setExpenses(expensesData || []);
-            setFriends(friendsData || []);
-        } catch (error) {
-            console.error('Failed to load data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [user?.user_id, loadData]);
 
     const handleCreateExpense = async (expenseData) => {
         setCreateError('');
@@ -92,8 +117,9 @@ export default function Dashboard() {
                 totalOwed += mySplit?.amount || 0;
             }
         });
-        return { totalLent, totalOwed, net: totalLent - totalOwed };
-    }, [expenses, user]);
+        const derivedNet = totalLent - totalOwed;
+        return { totalLent, totalOwed, net: netBalance ?? derivedNet };
+    }, [expenses, user, netBalance]);
 
     if (loading) {
         return (
@@ -290,7 +316,7 @@ export default function Dashboard() {
                                                     </p>
                                                 </div>
 
-                                                <div className="text-right flex-shrink-0">
+                                                <div className="text-right flex-shrink-0 min-w-[210px]">
                                                     <p className="font-bold text-slate-900 text-sm">
                                                         ${expense.total_amount?.toFixed(2)}
                                                     </p>
@@ -299,6 +325,45 @@ export default function Dashboard() {
                                                             ? `+$${netAmount.toFixed(2)} lent`
                                                             : `-$${netAmount.toFixed(2)} owed`}
                                                     </p>
+
+                                                    <div className="mt-2 flex justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-ghost text-xs px-3 py-1.5"
+                                                            onClick={() => {
+                                                                setEditError('');
+                                                                setEditExpenseId(expense.id);
+                                                                setEditDescription(expense.description || '');
+                                                                setEditTotalAmount(String(expense.total_amount ?? ''));
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-danger text-xs px-3 py-1.5"
+                                                            disabled={deletingExpenseId === expense.id}
+                                                            onClick={async () => {
+                                                                if (!window.confirm('Delete this expense?')) return;
+                                                                setDeletingExpenseId(expense.id);
+                                                                try {
+                                                                    await expenseService.deleteExpense(expense.id);
+                                                                    await loadData();
+                                                                } catch (err) {
+                                                                    console.error('Failed to delete expense:', err);
+                                                                    alert('Failed to delete expense');
+                                                                } finally {
+                                                                    setDeletingExpenseId(null);
+                                                                }
+                                                            }}
+                                                        >
+                                                            {deletingExpenseId === expense.id ? (
+                                                                <span className="spinner-dark" />
+                                                            ) : (
+                                                                'Delete'
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -377,9 +442,209 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Settle up card */}
+                        <div className="card">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-base font-bold text-slate-900">Settle up</h2>
+                                <span className="text-xs text-slate-500">{friends.length} friends</span>
+                            </div>
+
+                            {friends.length === 0 ? (
+                                <p className="text-sm text-slate-400 italic">
+                                    Add friends first to settle balances.
+                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                                            Pay to
+                                        </label>
+                                        <select
+                                            className="input"
+                                            value={settleToUserId}
+                                            onChange={(e) => {
+                                                setSettleToUserId(e.target.value);
+                                                setSettleError('');
+                                                setSettleSuccess('');
+                                            }}
+                                        >
+                                            <option value="">Select a friend</option>
+                                            {friends.map((f) => (
+                                                <option key={f.id} value={f.id}>
+                                                    {f.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                                            Amount ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            className="input"
+                                            value={settleAmount}
+                                            onChange={(e) => {
+                                                setSettleAmount(e.target.value);
+                                                setSettleError('');
+                                                setSettleSuccess('');
+                                            }}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+
+                                    {settleError && (
+                                        <div className="flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg">
+                                            <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            <div>{settleError}</div>
+                                        </div>
+                                    )}
+
+                                    {settleSuccess && (
+                                        <div className="flex items-start gap-2 text-sm bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-lg">
+                                            <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <div>{settleSuccess}</div>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        disabled={settling || !settleToUserId || !settleAmount || parseFloat(settleAmount) <= 0}
+                                        className="btn btn-primary w-full py-2.5"
+                                        onClick={async () => {
+                                            setSettling(true);
+                                            setSettleError('');
+                                            setSettleSuccess('');
+                                            try {
+                                                await expenseService.settleBalance(
+                                                    settleToUserId,
+                                                    parseFloat(settleAmount)
+                                                );
+                                                setSettleSuccess('Settlement recorded successfully.');
+                                                setSettleAmount('');
+                                                setSettleToUserId('');
+                                                await loadData();
+                                            } catch (err) {
+                                                const msg = err?.response?.data?.error || 'Failed to settle balance';
+                                                setSettleError(msg);
+                                            } finally {
+                                                setSettling(false);
+                                            }
+                                        }}
+                                    >
+                                        {settling ? <span className="spinner-dark" /> : 'Settle'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </main>
+
+            {/* Edit Expense Modal */}
+            {editExpenseId && (
+                <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
+                    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-6 animate-fade-in">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-slate-900">Edit expense</h3>
+                            <button
+                                type="button"
+                                className="btn btn-ghost text-xs px-3 py-1.5"
+                                onClick={() => {
+                                    setEditExpenseId(null);
+                                    setEditError('');
+                                }}
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Close
+                            </button>
+                        </div>
+
+                        {editError && (
+                            <div className="flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-3">
+                                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                <div>{editError}</div>
+                            </div>
+                        )}
+
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                setEditError('');
+                                try {
+                                    await expenseService.updateExpense(editExpenseId, {
+                                        description: editDescription,
+                                        total_amount: parseFloat(editTotalAmount),
+                                    });
+                                    setEditExpenseId(null);
+                                    setEditDescription('');
+                                    setEditTotalAmount('');
+                                    await loadData();
+                                } catch (err) {
+                                    const msg = err?.response?.data?.error || 'Failed to update expense';
+                                    setEditError(msg);
+                                }
+                            }}
+                            className="space-y-4"
+                        >
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                                    Description
+                                </label>
+                                <input
+                                    className="input"
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                                    Total Amount ($)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    className="input"
+                                    value={editTotalAmount}
+                                    onChange={(e) => setEditTotalAmount(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button type="submit" className="btn btn-primary flex-1 py-2.5">
+                                    Save
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary flex-1 py-2.5"
+                                    onClick={() => {
+                                        setEditExpenseId(null);
+                                        setEditError('');
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

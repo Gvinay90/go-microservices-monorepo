@@ -10,4 +10,5 @@ var (
 	ErrSplitMismatch      = errors.New("splits do not add up to total amount")
 	ErrExpenseNotFound    = errors.New("expense not found")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrInsufficientBalance = errors.New("insufficient balance to settle")
 )

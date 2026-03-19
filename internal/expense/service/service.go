@@ -22,4 +22,10 @@ type Service interface {
 
 	// SettleBalance settles a balance between users
 	SettleBalance(ctx context.Context, fromUserID, toUserID string, amount float64) error
+
+	// UpdateExpense updates an expense (description + total_amount)
+	UpdateExpense(ctx context.Context, expenseID string, description string, totalAmount float64) (*domain.Expense, error)
+
+	// DeleteExpense deletes an expense
+	DeleteExpense(ctx context.Context, expenseID string) error
 }

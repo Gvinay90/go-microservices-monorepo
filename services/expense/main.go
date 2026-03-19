@@ -35,7 +35,7 @@ func main() {
 
 	// 4. Run Migrations
 	log.Info("Running database migrations...")
-	if err := db.AutoMigrate(&storage.Expense{}, &storage.Split{}); err != nil {
+	if err := db.AutoMigrate(&storage.Expense{}, &storage.Split{}, &storage.Settlement{}); err != nil {
 		log.Error("Migration failed", "error", err)
 		os.Exit(1)
 	}

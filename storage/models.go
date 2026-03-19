@@ -35,3 +35,13 @@ type Balance struct {
 	ToUserID   string
 	Amount     float64
 }
+
+// Settlement records a payment from one user to another.
+// We keep this separate so balances can be updated after "settle up" without mutating expenses.
+type Settlement struct {
+	ID          uint `gorm:"primaryKey"`
+	FromUserID  string `gorm:"index"`
+	ToUserID    string `gorm:"index"`
+	Amount      float64
+	CreatedAt   int64
+}

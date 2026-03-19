@@ -85,6 +85,28 @@ func (s *expenseService) SettleBalance(ctx context.Context, fromUserID, toUserID
 	return nil
 }
 
+func (s *expenseService) UpdateExpense(ctx context.Context, expenseID string, description string, totalAmount float64) (*domain.Expense, error) {
+	s.log.Info("Updating expense", "expense_id", expenseID, "total_amount", totalAmount)
+
+	if description == "" {
+		return nil, domain.ErrInvalidDescription
+	}
+	if totalAmount <= 0 {
+		return nil, domain.ErrInvalidAmount
+	}
+
+	exp, err := s.repo.Update(ctx, expenseID, description, totalAmount)
+	if err != nil {
+		return nil, err
+	}
+	return exp, nil
+}
+
+func (s *expenseService) DeleteExpense(ctx context.Context, expenseID string) error {
+	s.log.Info("Deleting expense", "expense_id", expenseID)
+	return s.repo.Delete(ctx, expenseID)
+}
+
 func generateExpenseID(description string) string {
 	return fmt.Sprintf("exp_%d", time.Now().UnixNano())
 }

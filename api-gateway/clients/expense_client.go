@@ -75,3 +75,19 @@ func (c *ExpenseClient) DeleteExpense(ctx context.Context, token, expenseID stri
 	req := &pb.DeleteExpenseRequest{ExpenseId: expenseID}
 	return c.client.DeleteExpense(ctx, req)
 }
+
+func (c *ExpenseClient) SettleBalance(ctx context.Context, token, fromUserID, toUserID string, amount float64) (*pb.SettleBalanceResponse, error) {
+	ctx = c.contextWithAuth(ctx, token)
+	req := &pb.SettleBalanceRequest{
+		FromUserId: fromUserID,
+		ToUserId:   toUserID,
+		Amount:     amount,
+	}
+	return c.client.SettleBalance(ctx, req)
+}
+
+func (c *ExpenseClient) GetBalances(ctx context.Context, token, userID string) (*pb.GetBalancesResponse, error) {
+	ctx = c.contextWithAuth(ctx, token)
+	req := &pb.GetBalancesRequest{UserId: userID}
+	return c.client.GetBalances(ctx, req)
+}

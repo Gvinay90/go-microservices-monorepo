@@ -203,3 +203,63 @@ func (h *ExpenseHandler) DeleteExpense(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "expense deleted successfully"})
 }
+
+type SettleExpenseRequest struct {
+	ToUserID string  `json:"to_user_id" binding:"required"`
+	Amount   float64 `json:"amount" binding:"required,gt=0"`
+}
+
+// SettleBalance settles a balance between the authenticated user (from) and another user (to).
+// from_user_id is derived from the JWT claims.
+func (h *ExpenseHandler) SettleBalance(c *gin.Context) {
+	token, _ := c.Get("jwt_token")
+	tokenStr, _ := token.(string)
+
+	fromUserID, _ := c.Get("user_id")
+	fromUserIDStr, _ := fromUserID.(string)
+
+	var req SettleExpenseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := h.expenseClient.SettleBalance(c.Request.Context(), tokenStr, fromUserIDStr, req.ToUserID, req.Amount)
+	if err != nil {
+		h.logger.Error("Failed to settle balance", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to settle balance"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":            resp.Success,
+		"message":            resp.Message,
+		"remaining_balance": resp.RemainingBalance.Amount,
+		"remaining_from":    resp.RemainingBalance.FromUserId,
+		"remaining_to":      resp.RemainingBalance.ToUserId,
+	})
+}
+
+// GetNetBalance returns the authenticated user's net balance.
+func (h *ExpenseHandler) GetNetBalance(c *gin.Context) {
+	token, _ := c.Get("jwt_token")
+	tokenStr, _ := token.(string)
+
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
+	resp, err := h.expenseClient.GetBalances(c.Request.Context(), tokenStr, userIDStr)
+	if err != nil {
+		h.logger.Error("Failed to get balances", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get balance"})
+		return
+	}
+
+	// Our backend returns a single Balance entry for the net amount.
+	if resp.Balances == nil || len(resp.Balances) == 0 {
+		c.JSON(http.StatusOK, gin.H{"net_balance": 0})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"net_balance": resp.Balances[0].Amount})
+}

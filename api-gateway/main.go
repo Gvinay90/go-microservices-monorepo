@@ -128,8 +128,10 @@ func main() {
 				expenses.GET("", expenseHandler.ListExpenses)
 				expenses.POST("", expenseHandler.CreateExpense)
 				expenses.GET("/:id", expenseHandler.GetExpense)
+				expenses.GET("/net-balance", expenseHandler.GetNetBalance)
 				expenses.PUT("/:id", expenseHandler.UpdateExpense)
 				expenses.DELETE("/:id", expenseHandler.DeleteExpense)
+				expenses.POST("/settle", expenseHandler.SettleBalance)
 			}
 		}
 	}

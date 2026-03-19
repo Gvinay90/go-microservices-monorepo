@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/vinay/splitwise-grpc/pkg/auth"
 	"github.com/vinay/splitwise-grpc/internal/expense/domain"
 	"github.com/vinay/splitwise-grpc/internal/expense/service"
 	pb "github.com/vinay/splitwise-grpc/proto/expense"
@@ -72,6 +73,93 @@ func (h *GRPCHandler) ListExpenses(ctx context.Context, req *pb.ListExpensesRequ
 	}, nil
 }
 
+func (h *GRPCHandler) UpdateExpense(ctx context.Context, req *pb.UpdateExpenseRequest) (*pb.UpdateExpenseResponse, error) {
+	claims, ok := auth.GetClaims(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "no authentication claims found")
+	}
+	userID := auth.GetUserID(claims)
+
+	// Ownership check: allow only participants (payer or included in splits).
+	existing, err := h.svc.GetExpense(ctx, req.ExpenseId)
+	if err != nil {
+		return nil, h.mapError(err)
+	}
+	allowed := existing.PaidBy == userID
+	if !allowed {
+		for _, s := range existing.Splits {
+			if s.UserID == userID {
+				allowed = true
+				break
+			}
+		}
+	}
+	if !allowed {
+		return nil, status.Error(codes.PermissionDenied, "access denied: not expense participant")
+	}
+
+	updated, err := h.svc.UpdateExpense(ctx, req.ExpenseId, req.Description, req.TotalAmount)
+	if err != nil {
+		return nil, h.mapError(err)
+	}
+
+	return &pb.UpdateExpenseResponse{
+		Expense: toPBExpense(updated),
+	}, nil
+}
+
+func (h *GRPCHandler) DeleteExpense(ctx context.Context, req *pb.DeleteExpenseRequest) (*pb.DeleteExpenseResponse, error) {
+	claims, ok := auth.GetClaims(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "no authentication claims found")
+	}
+	userID := auth.GetUserID(claims)
+
+	existing, err := h.svc.GetExpense(ctx, req.ExpenseId)
+	if err != nil {
+		return nil, h.mapError(err)
+	}
+
+	allowed := existing.PaidBy == userID
+	if !allowed {
+		for _, s := range existing.Splits {
+			if s.UserID == userID {
+				allowed = true
+				break
+			}
+		}
+	}
+	if !allowed {
+		return nil, status.Error(codes.PermissionDenied, "access denied: not expense participant")
+	}
+
+	if err := h.svc.DeleteExpense(ctx, req.ExpenseId); err != nil {
+		return nil, h.mapError(err)
+	}
+
+	return &pb.DeleteExpenseResponse{
+		Success: true,
+		Message: "expense deleted successfully",
+	}, nil
+}
+
+func (h *GRPCHandler) GetBalances(ctx context.Context, req *pb.GetBalancesRequest) (*pb.GetBalancesResponse, error) {
+	net, err := h.svc.GetUserBalance(ctx, req.UserId)
+	if err != nil {
+		return nil, h.mapError(err)
+	}
+
+	return &pb.GetBalancesResponse{
+		Balances: []*pb.Balance{
+			{
+				FromUserId: req.UserId,
+				ToUserId:   "net_balance",
+				Amount:     net,
+			},
+		},
+	}, nil
+}
+
 func (h *GRPCHandler) SettleBalance(ctx context.Context, req *pb.SettleBalanceRequest) (*pb.SettleBalanceResponse, error) {
 	if err := h.svc.SettleBalance(ctx, req.FromUserId, req.ToUserId, req.Amount); err != nil {
 		return nil, h.mapError(err)
@@ -124,6 +212,8 @@ func (h *GRPCHandler) mapError(err error) error {
 		return status.Error(codes.InvalidArgument, "at least one split is required")
 	case errors.Is(err, domain.ErrSplitMismatch):
 		return status.Error(codes.InvalidArgument, "splits do not add up to total amount")
+	case errors.Is(err, domain.ErrInsufficientBalance):
+		return status.Error(codes.FailedPrecondition, "insufficient balance to settle")
 	default:
 		h.log.Error("Unexpected error", "error", err)
 		return status.Error(codes.Internal, "internal server error")

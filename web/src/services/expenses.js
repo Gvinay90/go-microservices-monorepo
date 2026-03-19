@@ -30,6 +30,21 @@ export const expenseService = {
         const response = await api.delete(`/expenses/${id}`);
         return response.data;
     },
+
+    // Settle balance (from authenticated user -> toUserId)
+    settleBalance: async (toUserId, amount) => {
+        const response = await api.post('/expenses/settle', {
+            to_user_id: toUserId,
+            amount,
+        });
+        return response.data;
+    },
+
+    // Get authenticated user's net balance
+    getNetBalance: async () => {
+        const response = await api.get('/expenses/net-balance');
+        return response.data.net_balance;
+    },
 };
 
 export const userService = {
